@@ -1,0 +1,1841 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Mercado — Dashboard de Vendas</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{
+  --bg:#100F26;
+  --panel:#1A1836;
+  --panel-alt:#211F45;
+  --border:#2E2C57;
+  --text:#F4F3FF;
+  --muted:#9D9AC7;
+  --accent:#7B5CF5;
+  --accent2:#35D0BA;
+  --accent3:#FFB648;
+  --danger:#FF6B6B;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-thumb{background:var(--panel-alt);border-radius:8px;}
+
+/* ---------- layout shell ---------- */
+header.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 28px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:rgba(16,15,38,0.92);backdrop-filter:blur(6px);z-index:50;
+}
+header.topbar h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px;}
+header.topbar h1 span{color:var(--accent2);}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+.btn{
+  background:var(--panel-alt);color:var(--text);border:1px solid var(--border);
+  padding:9px 16px;border-radius:10px;font-size:13px;cursor:pointer;font-weight:600;
+  transition:.15s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--accent);}
+.btn.primary{background:var(--accent);border-color:var(--accent);}
+.btn.primary:hover{background:#6A4CE0;}
+.btn.ghost{background:transparent;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+main{padding:24px 28px 60px;max-width:1500px;margin:0 auto;}
+
+/* ---------- upload screen ---------- */
+#uploadScreen{
+  max-width:640px;margin:8vh auto;text-align:center;padding:48px 36px;
+  background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);
+}
+#uploadScreen.dragover{border-color:var(--accent);background:var(--panel-alt);}
+#uploadScreen h2{margin-top:0;font-size:22px;}
+#uploadScreen p{color:var(--muted);font-size:14px;line-height:1.6;}
+#uploadScreen .drop-icon{font-size:40px;margin-bottom:6px;}
+#fileInput{display:none;}
+
+/* ---------- kpis ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px;}
+.kpi-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+.kpi-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;}
+.kpi-card .value{font-size:26px;font-weight:700;}
+.kpi-card .sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.kpi-card.accent{border-color:var(--accent);}
+
+/* ---------- filters ---------- */
+.filters{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:22px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;
+}
+.filter-group{display:flex;flex-direction:column;gap:6px;min-width:160px;}
+.filter-group label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.filter-group select,.filter-group input[type=date]{
+  background:var(--panel-alt);border:1px solid var(--border);color:var(--text);
+  padding:8px 10px;border-radius:8px;font-size:13px;
+}
+.chip-select{position:relative;}
+.chip-btn{
+  background:var(--panel-alt);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;min-width:170px;text-align:left;
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+}
+.chip-menu{
+  display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--panel-alt);
+  border:1px solid var(--border);border-radius:10px;padding:10px;z-index:60;min-width:220px;
+  max-height:240px;overflow:auto;box-shadow:0 12px 30px rgba(0,0,0,.4);
+}
+.chip-menu.open{display:block;}
+.chip-menu label{display:flex;gap:8px;align-items:center;font-size:13px;padding:5px 4px;color:var(--text);cursor:pointer;}
+.chip-menu .menu-actions{display:flex;gap:8px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+.chip-menu .menu-actions button{flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.toggle-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);}
+.toggle-row input{accent-color:var(--accent);}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border);}
+.tab-btn{
+  background:transparent;border:none;color:var(--muted);padding:11px 18px;font-size:14px;
+  font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;
+}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--accent);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ---------- panels/cards ---------- */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.panel-head h3{margin:0;font-size:15px;}
+.panel-head .desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.chart-wrap{position:relative;height:320px;}
+.grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;}
+.grid-2 .chart-wrap{height:360px;}
+
+/* ---------- tables ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{
+  text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
+  letter-spacing:.4px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;
+  position:sticky;top:0;background:var(--panel);
+}
+thead th:hover{color:var(--text);}
+thead th.sorted::after{content:" ▾";color:var(--accent);}
+thead th.sorted-asc::after{content:" ▴";color:var(--accent);}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--border);}
+tbody tr:hover{background:var(--panel-alt);}
+.table-scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:10px;}
+.table-scroll table thead th{background:var(--panel-alt);}
+.table-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:var(--muted);}
+.pager{display:flex;gap:6px;}
+.pager button{background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;}
+.pager button:disabled{opacity:.35;cursor:not-allowed;}
+.search-box{
+  background:var(--panel-alt);border:1px solid var(--border);color:var(--text);padding:7px 10px;
+  border-radius:8px;font-size:12px;width:220px;
+}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+.pill.paga{background:rgba(53,208,186,.15);color:var(--accent2);}
+.pill.cancelada{background:rgba(255,107,107,.15);color:var(--danger);}
+
+/* granularity segmented control */
+.segmented{display:flex;background:var(--panel-alt);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px;}
+.segmented button{flex:1;background:transparent;border:none;color:var(--muted);padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;}
+.segmented button.active{background:var(--accent);color:#fff;}
+
+.legend-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted);}
+.legend-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;}
+
+.rank-list{display:flex;flex-direction:column;gap:10px;}
+.rank-row{display:flex;align-items:center;gap:12px;}
+.rank-idx{width:22px;color:var(--muted);font-size:12px;font-weight:700;}
+.rank-bar-wrap{flex:1;background:var(--panel-alt);border-radius:6px;overflow:hidden;height:26px;position:relative;}
+.rank-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;}
+.rank-label{position:absolute;left:10px;top:0;height:100%;display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;max-width:75%;text-overflow:ellipsis;}
+.rank-value{width:110px;text-align:right;font-size:12px;color:var(--muted);}
+
+#dashboard[hidden]{display:none;}
+footer.credit{text-align:center;color:var(--muted);font-size:11px;padding:24px;}
+
+.kpi-grid-7{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:4px;}
+.kpi-grid-7 .kpi-card .value{font-size:22px;}
+
+.inline-input{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);}
+.inline-input input[type=number]{
+  width:64px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);
+  padding:6px 8px;border-radius:8px;font-size:13px;
+}
+.mono-badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 6px;border-radius:6px;font-size:11px;font-weight:700;}
+.badge-stale{background:rgba(255,107,107,.15);color:var(--danger);}
+.badge-high{background:rgba(53,208,186,.15);color:var(--accent2);}
+.badge-low{background:rgba(255,182,72,.15);color:var(--accent3);}
+.no-cost-msg{color:var(--muted);font-size:13px;padding:20px;text-align:center;background:var(--panel-alt);border-radius:10px;}
+
+.heatmap-wrap{overflow-x:auto;}
+.heatmap{border-collapse:separate;border-spacing:4px;font-size:11px;}
+.heatmap th{color:var(--muted);font-weight:600;font-size:11px;padding:4px 6px;text-align:center;}
+.heatmap th.hour-label{text-align:right;padding-right:10px;white-space:nowrap;}
+.heatmap td{
+  width:76px;height:44px;border-radius:8px;text-align:center;vertical-align:middle;
+  color:var(--text);font-weight:700;font-size:12px;cursor:default;position:relative;
+}
+.heatmap td.empty{background:var(--panel-alt);color:var(--muted);font-weight:400;font-size:11px;}
+.heatmap td .cnt{display:block;font-size:9px;font-weight:400;opacity:.75;margin-top:1px;}
+.select-inline{
+  background:var(--panel-alt);border:1px solid var(--border);color:var(--text);
+  padding:8px 10px;border-radius:8px;font-size:13px;
+}
+
+@media(max-width:1100px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .kpi-grid-7{grid-template-columns:repeat(2,1fr);}
+  .grid-2{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Controle de <span>Mercado</span> — Dashboard de Vendas</h1>
+  <div class="topbar-actions">
+    <button class="btn ghost" id="btnNewFile" hidden>Trocar planilha</button>
+    <button class="btn" id="btnExportExcel" hidden>Exportar Excel</button>
+    <button class="btn" id="btnExport" hidden>Exportar visão (PNG)</button>
+  </div>
+</header>
+
+<main>
+  <div id="uploadScreen">
+    <div class="drop-icon">📊</div>
+    <h2>Carregue a planilha de vendas</h2>
+    <p>Arraste o arquivo .xlsx aqui ou clique para selecionar.<br>
+    Colunas esperadas: Data, Loja, Produto, Categoria, Qtd., Valor Total, Status.</p>
+    <button class="btn primary" id="btnPick">Selecionar arquivo</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <p id="uploadError" style="color:var(--danger);display:none;margin-top:14px;"></p>
+  </div>
+
+  <div id="dashboard" hidden>
+
+    <div class="kpi-grid">
+      <div class="kpi-card accent">
+        <div class="label">Valor total vendido</div>
+        <div class="value" id="kpiValor">—</div>
+        <div class="sub" id="kpiValorSub">no período filtrado</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Itens vendidos</div>
+        <div class="value" id="kpiQtd">—</div>
+        <div class="sub">unidades</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Transações</div>
+        <div class="value" id="kpiTransacoes">—</div>
+        <div class="sub" id="kpiTicket">ticket médio —</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Lojas ativas</div>
+        <div class="value" id="kpiLojas">—</div>
+        <div class="sub">no filtro atual</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Período</div>
+        <div class="value" id="kpiPeriodo" style="font-size:15px;">—</div>
+        <div class="sub" id="kpiDias">—</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="filter-group chip-select" id="filtroLojaWrap">
+        <label>Lojas</label>
+        <button class="chip-btn" id="filtroLojaBtn">Todas as lojas ▾</button>
+        <div class="chip-menu" id="filtroLojaMenu"></div>
+      </div>
+      <div class="filter-group chip-select" id="filtroCategoriaWrap">
+        <label>Categorias</label>
+        <button class="chip-btn" id="filtroCategoriaBtn">Todas as categorias ▾</button>
+        <div class="chip-menu" id="filtroCategoriaMenu"></div>
+      </div>
+      <div class="filter-group">
+        <label>De</label>
+        <input type="date" id="filtroDataDe">
+      </div>
+      <div class="filter-group">
+        <label>Até</label>
+        <input type="date" id="filtroDataAte">
+      </div>
+      <div class="filter-group">
+        <label style="opacity:0;">.</label>
+        <div class="toggle-row"><input type="checkbox" id="filtroCanceladas"><label for="filtroCanceladas">Incluir vendas canceladas</label></div>
+      </div>
+      <div class="filter-group">
+        <label style="opacity:0;">.</label>
+        <button class="btn ghost" id="btnResetFiltros">Limpar filtros</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="diario">Vendas Diárias</button>
+      <button class="tab-btn" data-tab="itens">Itens Mais Vendidos</button>
+      <button class="tab-btn" data-tab="consolidado">Consolidado</button>
+      <button class="tab-btn" data-tab="rentabilidade">Rentabilidade</button>
+      <button class="tab-btn" data-tab="cancelados">Cancelados</button>
+      <button class="tab-btn" data-tab="ticket-horario">Ticket por Horário</button>
+    </div>
+
+    <!-- TAB 1: VENDAS DIARIAS -->
+    <div class="tab-panel active" id="tab-diario">
+      <div class="panel" id="cardDiarioChart">
+        <div class="panel-head">
+          <div>
+            <h3>Valor vendido por dia e por loja</h3>
+            <div class="desc">Soma do Valor Total por dia, empilhado por loja</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartDiario"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Detalhe por dia, loja e item</h3>
+            <div class="desc" id="descDiarioTable">Quantidade e valor de cada produto vendido, por dia e por loja</div>
+          </div>
+          <input class="search-box" id="searchDiario" placeholder="Buscar produto...">
+        </div>
+        <div class="table-scroll">
+          <table id="tableDiario">
+            <thead>
+              <tr>
+                <th data-key="data">Data</th>
+                <th data-key="loja">Loja</th>
+                <th data-key="produto">Produto</th>
+                <th data-key="categoria">Categoria</th>
+                <th data-key="qtd">Qtd.</th>
+                <th data-key="valor">Valor</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="table-foot">
+          <span id="diarioCount">0 linhas</span>
+          <div class="pager">
+            <button id="diarioPrev">‹ Anterior</button>
+            <span id="diarioPageLabel">1 / 1</span>
+            <button id="diarioNext">Próxima ›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: ITENS MAIS VENDIDOS -->
+    <div class="tab-panel" id="tab-itens">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Itens mais vendidos</h3>
+            <div class="desc">Ranking por loja e categoria — use os filtros gerais acima para restringir período</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <select id="itensLojaSel"></select>
+            <select id="itensCategoriaSel"></select>
+            <select id="itensMetricaSel">
+              <option value="qtd">Ordenar por quantidade</option>
+              <option value="valor">Ordenar por valor</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div class="desc" style="margin-bottom:10px;">Top 10 produtos</div>
+            <div class="rank-list" id="rankItens"></div>
+          </div>
+          <div>
+            <div class="desc" style="margin-bottom:10px;">Participação por categoria (na seleção)</div>
+            <div class="chart-wrap" style="height:300px;"><canvas id="chartCategoriaPie"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Mais vendido por loja</h3>
+            <div class="desc">Produto nº1 em quantidade, em cada loja, dentro do período e categoria filtrados</div>
+          </div>
+        </div>
+        <div id="topPorLojaGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: CONSOLIDADO -->
+    <div class="tab-panel" id="tab-consolidado">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Consolidado de vendas</h3>
+            <div class="desc" id="descConsolidado">Quantidade e valor agregados por período</div>
+          </div>
+          <div class="segmented" id="granularidadeSeg">
+            <button data-g="dia" class="active">Dia</button>
+            <button data-g="semana">Semana</button>
+            <button data-g="mes">Mês</button>
+            <button data-g="ano">Ano</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartConsolidado"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Itens mais vendidos no período</h3>
+              <div class="desc">Top 8, por quantidade</div>
+            </div>
+          </div>
+          <div class="rank-list" id="rankConsolidadoItens"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Tabela consolidada</h3>
+              <div class="desc" id="descConsolidadoTable">Totais por período</div>
+            </div>
+          </div>
+          <div class="table-scroll" style="max-height:340px;">
+            <table id="tableConsolidado">
+              <thead><tr><th>Período</th><th>Qtd.</th><th>Valor</th><th>Transações</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: RENTABILIDADE -->
+    <div class="tab-panel" id="tab-rentabilidade">
+      <div id="rentabilidadeContent"></div>
+    </div>
+
+    <!-- TAB 5: CANCELADOS -->
+    <div class="tab-panel" id="tab-cancelados">
+      <div id="canceladosContent"></div>
+    </div>
+
+    <!-- TAB 6: TICKET POR HORÁRIO -->
+    <div class="tab-panel" id="tab-ticket-horario">
+      <div id="ticketHorarioContent"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="credit">Dashboard gerado a partir da planilha carregada — os dados não são enviados a nenhum servidor, todo o processamento acontece no seu navegador.</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- State ----------------
+  let RAW = [];              // all parsed records
+  let STORES = [];
+  let CATEGORIES = [];
+  let selectedStores = new Set();
+  let selectedCategories = new Set();
+  let includeCancelled = false;
+  let dateFrom = null, dateTo = null;
+
+  let diarioSort = { key: 'data', dir: 'desc' };
+  let diarioPage = 1;
+  const PAGE_SIZE = 50;
+  let diarioSearch = '';
+
+  let granularity = 'dia';
+  let chartDiario, chartConsolidado, chartCategoriaPie;
+  let COST_AVAILABLE = false;
+  let PAYMENT_AVAILABLE = false;
+  let REFERENCE_DATE = null;
+  let staleDaysThreshold = 7;
+  let cancelGranularity = 'dia';
+  let chartCancelados, chartPagamentoPie;
+  let ticketLojaFiltro = '__all__';
+  let ticketSort = { key: 'valor', dir: 'desc' };
+  let ticketPage = 1;
+
+  const STORE_COLORS = ['#7B5CF5', '#35D0BA', '#FFB648', '#F97583', '#5CC8FF'];
+  const PALETTE = ['#7B5CF5','#35D0BA','#FFB648','#F97583','#5CC8FF','#B98CFF','#4ADE80','#FF9F6B','#7ED6DF','#C77DFF','#FFD166','#06D6A0','#EF476F','#118AB2'];
+
+  // Draws each dataset's value directly on top of / inside its bar or point,
+  // so the chart doesn't need a numbered axis on the side.
+  const valueLabelsPlugin = {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart){
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = '700 11px Arial';
+      ctx.textAlign = 'center';
+      chart.data.datasets.forEach((dataset, dsIndex) => {
+        if (!dataset.showValueLabel) return;
+        const meta = chart.getDatasetMeta(dsIndex);
+        if (meta.hidden) return;
+        const isLine = (dataset.type || chart.config.type) === 'line';
+        meta.data.forEach((element, i) => {
+          const value = dataset.data[i];
+          if (value === null || value === undefined || value === 0) return;
+          const formatter = dataset.valueLabelFormatter || (v => v);
+          const text = formatter(value);
+          ctx.fillStyle = dataset.valueLabelColor || '#F4F3FF';
+          if (isLine){
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(text, element.x, element.y - 8);
+          } else {
+            // bar: only label if the segment is tall enough to read comfortably
+            const h = (element.base !== undefined) ? Math.abs(element.base - element.y) : element.height;
+            if (h < 16) return;
+            ctx.textBaseline = 'top';
+            ctx.fillText(text, element.x, element.y + 4);
+          }
+        });
+      });
+      ctx.restore();
+    }
+  };
+  Chart.register(valueLabelsPlugin);
+  const money = (n) => (n||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+  const num = (n) => (n||0).toLocaleString('pt-BR');
+  const pad2 = (n) => String(n).padStart(2,'0');
+  const fmtDate = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
+  const isoDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+
+  function dateOnly(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+  function isoWeek(d){
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(date.getUTCFullYear(),0,4));
+    const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay()+6)%7)) / 7);
+    return { week, year: date.getUTCFullYear() };
+  }
+
+  // ---------------- File handling ----------------
+  const uploadScreen = document.getElementById('uploadScreen');
+  const fileInput = document.getElementById('fileInput');
+  const dashboard = document.getElementById('dashboard');
+  const uploadError = document.getElementById('uploadError');
+
+  document.getElementById('btnPick').addEventListener('click', () => fileInput.click());
+  document.getElementById('btnNewFile').addEventListener('click', () => {
+    dashboard.hidden = true;
+    document.getElementById('btnNewFile').hidden = true;
+    document.getElementById('btnExport').hidden = true;
+    document.getElementById('btnExportExcel').hidden = true;
+    uploadScreen.style.display = 'block';
+    fileInput.value = '';
+  });
+
+  ['dragover','dragenter'].forEach(ev => uploadScreen.addEventListener(ev, (e) => {
+    e.preventDefault(); uploadScreen.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(ev => uploadScreen.addEventListener(ev, (e) => {
+    e.preventDefault(); uploadScreen.classList.remove('dragover');
+  }));
+  uploadScreen.addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (f) handleFile(f);
+  });
+
+  function handleFile(file){
+    uploadError.style.display = 'none';
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array', cellDates:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null, raw:true});
+        parseRows(rows);
+      }catch(err){
+        showUploadError('Não consegui ler esse arquivo. Verifique se é um .xlsx válido. (' + err.message + ')');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function showUploadError(msg){
+    uploadError.textContent = msg;
+    uploadError.style.display = 'block';
+  }
+
+  function findCol(headers, names){
+    for(const n of names){
+      const i = headers.findIndex(h => (h||'').toString().trim().toLowerCase() === n.toLowerCase());
+      if (i !== -1) return i;
+    }
+    return -1;
+  }
+
+  function parseRows(rows){
+    if (!rows || rows.length < 2){ showUploadError('Planilha vazia ou sem linhas de dados.'); return; }
+    const headers = rows[0].map(h => (h||'').toString());
+    const col = {
+      data: findCol(headers, ['Data']),
+      loja: findCol(headers, ['Loja']),
+      produto: findCol(headers, ['Produto']),
+      categoria: findCol(headers, ['Categoria']),
+      qtd: findCol(headers, ['Qtd.','Qtd','Quantidade']),
+      valor: findCol(headers, ['Valor Total','Valor']),
+      status: findCol(headers, ['Status']),
+      transacao: findCol(headers, ['ID da Transação','ID Transação']),
+      custo: findCol(headers, ['Último preço de compra un.','Preço de compra un.','Custo un.']),
+      cliente: findCol(headers, ['Cliente']),
+      pagamento: findCol(headers, ['Forma de Pagamento']),
+    };
+    const missing = Object.entries(col).filter(([k,v]) => v === -1 && k !== 'status' && k !== 'transacao');
+    if (missing.length){
+      showUploadError('Não encontrei as colunas: ' + missing.map(m=>m[0]).join(', ') + '. Confira os cabeçalhos da planilha.');
+      return;
+    }
+
+    const out = [];
+    for (let r = 1; r < rows.length; r++){
+      const row = rows[r];
+      if (!row || row[col.loja] == null) continue;
+      let d = row[col.data];
+      if (typeof d === 'number') d = XLSX.SSF.parse_date_code(d);
+      if (!(d instanceof Date)){
+        d = d ? new Date(d) : null;
+      }
+      if (!d || isNaN(d)) continue;
+      out.push({
+        data: dateOnly(d),
+        dataHora: d,
+        hora: d.getHours(),
+        loja: (row[col.loja]||'').toString().trim(),
+        produto: (row[col.produto]||'').toString().trim(),
+        categoria: (row[col.categoria]||'Sem categoria').toString().trim(),
+        qtd: Number(row[col.qtd]) || 0,
+        valor: Number(row[col.valor]) || 0,
+        status: col.status !== -1 ? (row[col.status]||'Paga').toString().trim() : 'Paga',
+        transacao: col.transacao !== -1 ? row[col.transacao] : (r),
+        custoUnit: col.custo !== -1 && row[col.custo] != null ? Number(row[col.custo]) : null,
+        cliente: col.cliente !== -1 ? (row[col.cliente]||'').toString().trim() : '',
+        pagamento: col.pagamento !== -1 ? (row[col.pagamento]||'Não informado').toString().trim() : 'Não informado',
+      });
+    }
+    if (!out.length){ showUploadError('Nenhuma linha válida encontrada na planilha.'); return; }
+    RAW = out;
+    COST_AVAILABLE = col.custo !== -1;
+    PAYMENT_AVAILABLE = col.pagamento !== -1;
+    initDashboard();
+  }
+
+  // ---------------- Init dashboard ----------------
+  function initDashboard(){
+    STORES = [...new Set(RAW.map(r => r.loja))].sort();
+    CATEGORIES = [...new Set(RAW.map(r => r.categoria))].sort();
+    selectedStores = new Set(STORES);
+    selectedCategories = new Set(CATEGORIES);
+
+    const dates = RAW.map(r => r.data.getTime());
+    dateFrom = new Date(Math.min(...dates));
+    dateTo = new Date(Math.max(...dates));
+    REFERENCE_DATE = new Date(Math.max(...dates));
+    document.getElementById('filtroDataDe').value = isoDate(dateFrom);
+    document.getElementById('filtroDataAte').value = isoDate(dateTo);
+
+    buildChipMenu('filtroLojaMenu', STORES, selectedStores, refreshAll, 'filtroLojaBtn', 'lojas');
+    buildChipMenu('filtroCategoriaMenu', CATEGORIES, selectedCategories, refreshAll, 'filtroCategoriaBtn', 'categorias');
+
+    // itens tab selects
+    const lojaSel = document.getElementById('itensLojaSel');
+    lojaSel.innerHTML = '<option value="__all__">Todas as lojas</option>' + STORES.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    const catSel = document.getElementById('itensCategoriaSel');
+    catSel.innerHTML = '<option value="__all__">Todas as categorias</option>' + CATEGORIES.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    lojaSel.addEventListener('change', renderItensTab);
+    catSel.addEventListener('change', renderItensTab);
+    document.getElementById('itensMetricaSel').addEventListener('change', renderItensTab);
+
+    uploadScreen.style.display = 'none';
+    dashboard.hidden = false;
+    document.getElementById('btnNewFile').hidden = false;
+    document.getElementById('btnExport').hidden = false;
+    document.getElementById('btnExportExcel').hidden = false;
+
+    refreshAll();
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------------- Chip multi-select ----------------
+  function buildChipMenu(menuId, options, selectedSet, onChange, btnId, labelPlural){
+    const menu = document.getElementById(menuId);
+    const btn = document.getElementById(btnId);
+    menu.innerHTML = options.map(o => `
+      <label><input type="checkbox" value="${escapeHtml(o)}" checked> ${escapeHtml(o)}</label>
+    `).join('') + `
+      <div class="menu-actions">
+        <button data-act="all">Selecionar todas</button>
+        <button data-act="none">Limpar</button>
+      </div>`;
+
+    menu.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) selectedSet.add(cb.value); else selectedSet.delete(cb.value);
+        updateChipLabel(btn, selectedSet, options.length, labelPlural);
+        onChange();
+      });
+    });
+    menu.querySelector('[data-act="all"]').addEventListener('click', () => {
+      options.forEach(o => selectedSet.add(o));
+      menu.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+      updateChipLabel(btn, selectedSet, options.length, labelPlural);
+      onChange();
+    });
+    menu.querySelector('[data-act="none"]').addEventListener('click', () => {
+      selectedSet.clear();
+      menu.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+      updateChipLabel(btn, selectedSet, options.length, labelPlural);
+      onChange();
+    });
+
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.chip-menu.open').forEach(m => { if (m !== menu) m.classList.remove('open'); });
+      menu.classList.toggle('open');
+    };
+    updateChipLabel(btn, selectedSet, options.length, labelPlural);
+  }
+  document.addEventListener('click', () => document.querySelectorAll('.chip-menu.open').forEach(m => m.classList.remove('open')));
+
+  function updateChipLabel(btn, selectedSet, total, labelPlural){
+    if (selectedSet.size === total) btn.textContent = `Todas as ${labelPlural} ▾`;
+    else if (selectedSet.size === 0) btn.textContent = `Nenhuma selecionada ▾`;
+    else if (selectedSet.size === 1) btn.textContent = `${[...selectedSet][0]} ▾`;
+    else btn.textContent = `${selectedSet.size} ${labelPlural} selecionadas ▾`;
+  }
+
+  document.getElementById('filtroDataDe').addEventListener('change', refreshAll);
+  document.getElementById('filtroDataAte').addEventListener('change', refreshAll);
+  document.getElementById('filtroCanceladas').addEventListener('change', (e) => { includeCancelled = e.target.checked; refreshAll(); });
+  document.getElementById('btnResetFiltros').addEventListener('click', () => {
+    selectedStores = new Set(STORES);
+    selectedCategories = new Set(CATEGORIES);
+    includeCancelled = false;
+    document.getElementById('filtroCanceladas').checked = false;
+    const dates = RAW.map(r => r.data.getTime());
+    dateFrom = new Date(Math.min(...dates));
+    dateTo = new Date(Math.max(...dates));
+    document.getElementById('filtroDataDe').value = isoDate(dateFrom);
+    document.getElementById('filtroDataAte').value = isoDate(dateTo);
+    buildChipMenu('filtroLojaMenu', STORES, selectedStores, refreshAll, 'filtroLojaBtn', 'lojas');
+    buildChipMenu('filtroCategoriaMenu', CATEGORIES, selectedCategories, refreshAll, 'filtroCategoriaBtn', 'categorias');
+    refreshAll();
+  });
+
+  // ---------------- Tabs ----------------
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------------- Filtering core ----------------
+  function getFilteredRecords(){
+    const from = document.getElementById('filtroDataDe').value ? new Date(document.getElementById('filtroDataDe').value + 'T00:00:00') : null;
+    const to = document.getElementById('filtroDataAte').value ? new Date(document.getElementById('filtroDataAte').value + 'T00:00:00') : null;
+    return RAW.filter(r => {
+      if (!selectedStores.has(r.loja)) return false;
+      if (!selectedCategories.has(r.categoria)) return false;
+      if (!includeCancelled && r.status.toLowerCase().startsWith('cancel')) return false;
+      if (from && r.data < from) return false;
+      if (to && r.data > to) return false;
+      return true;
+    });
+  }
+
+  function getDateRange(){
+    const from = document.getElementById('filtroDataDe').value ? new Date(document.getElementById('filtroDataDe').value + 'T00:00:00') : null;
+    const to = document.getElementById('filtroDataAte').value ? new Date(document.getElementById('filtroDataAte').value + 'T00:00:00') : null;
+    return { from, to };
+  }
+
+  function getCanceladosRecords(){
+    const { from, to } = getDateRange();
+    return RAW.filter(r => {
+      if (!selectedStores.has(r.loja)) return false;
+      if (!selectedCategories.has(r.categoria)) return false;
+      if (!r.status.toLowerCase().startsWith('cancel')) return false;
+      if (from && r.data < from) return false;
+      if (to && r.data > to) return false;
+      return true;
+    });
+  }
+
+  function getAllRecordsIgnoringStatus(){
+    const { from, to } = getDateRange();
+    return RAW.filter(r => {
+      if (!selectedStores.has(r.loja)) return false;
+      if (!selectedCategories.has(r.categoria)) return false;
+      if (from && r.data < from) return false;
+      if (to && r.data > to) return false;
+      return true;
+    });
+  }
+
+  function refreshAll(){
+    const rows = getFilteredRecords();
+    renderKPIs(rows);
+    renderDiarioTab(rows);
+    renderItensTab();
+    renderConsolidadoTab(rows);
+    renderRentabilidadeTab(rows);
+    renderCanceladosTab();
+    renderTicketHorarioTab();
+  }
+
+  // ---------------- KPIs ----------------
+  function renderKPIs(rows){
+    const totalValor = rows.reduce((s,r) => s + r.valor, 0);
+    const totalQtd = rows.reduce((s,r) => s + r.qtd, 0);
+    const transacoes = new Set(rows.map(r => r.transacao)).size;
+    const lojasAtivas = new Set(rows.map(r => r.loja)).size;
+
+    document.getElementById('kpiValor').textContent = money(totalValor);
+    document.getElementById('kpiQtd').textContent = num(totalQtd);
+    document.getElementById('kpiTransacoes').textContent = num(transacoes);
+    document.getElementById('kpiTicket').textContent = 'ticket médio ' + money(transacoes ? totalValor/transacoes : 0);
+    document.getElementById('kpiLojas').textContent = lojasAtivas + ' / ' + STORES.length;
+
+    if (rows.length){
+      const times = rows.map(r=>r.data.getTime());
+      const min = new Date(Math.min(...times)), max = new Date(Math.max(...times));
+      const days = Math.round((max-min)/86400000) + 1;
+      document.getElementById('kpiPeriodo').textContent = fmtDate(min) + ' – ' + fmtDate(max);
+      document.getElementById('kpiDias').textContent = days + ' dia(s)';
+    } else {
+      document.getElementById('kpiPeriodo').textContent = '—';
+      document.getElementById('kpiDias').textContent = 'nenhum registro no filtro';
+    }
+  }
+
+  // ---------------- TAB 1: Diário ----------------
+  function renderDiarioTab(rows){
+    // chart: value per day, stacked by store
+    const byDay = new Map(); // dayKey -> {store: valor}
+    rows.forEach(r => {
+      const key = isoDate(r.data);
+      if (!byDay.has(key)) byDay.set(key, {});
+      byDay.get(key)[r.loja] = (byDay.get(key)[r.loja] || 0) + r.valor;
+    });
+    const days = [...byDay.keys()].sort();
+    const datasets = STORES.filter(s => selectedStores.has(s)).map((s, i) => ({
+      label: s,
+      data: days.map(d => +(byDay.get(d)[s] || 0).toFixed(2)),
+      backgroundColor: STORE_COLORS[i % STORE_COLORS.length],
+      stack: 'v',
+      borderRadius: 3,
+      showValueLabel: true,
+      valueLabelFormatter: v => 'R$ ' + Math.round(v).toLocaleString('pt-BR'),
+      valueLabelColor: '#FFFFFF',
+    }));
+
+    if (chartDiario) chartDiario.destroy();
+    chartDiario = new Chart(document.getElementById('chartDiario'), {
+      type: 'bar',
+      data: { labels: days.map(d => fmtDate(new Date(d+'T00:00:00'))), datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 18 } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#9D9AC7', maxRotation: 60, minRotation: 0 }, grid: { display:false } },
+          y: { stacked: true, display:false, grace:'12%' },
+        },
+        plugins: {
+          legend: { labels: { color:'#F4F3FF', boxWidth:10 } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}` } },
+        }
+      }
+    });
+
+    renderDiarioTable(rows);
+  }
+
+  let diarioRowsCache = [];
+  function renderDiarioTable(rows){
+    diarioRowsCache = rows;
+    document.getElementById('searchDiario').oninput = (e) => { diarioSearch = e.target.value.toLowerCase(); diarioPage = 1; drawDiarioTable(); };
+    document.querySelectorAll('#tableDiario thead th').forEach(th => {
+      th.onclick = () => {
+        const key = th.dataset.key;
+        if (diarioSort.key === key) diarioSort.dir = diarioSort.dir === 'asc' ? 'desc' : 'asc';
+        else { diarioSort.key = key; diarioSort.dir = 'desc'; }
+        diarioPage = 1;
+        drawDiarioTable();
+      };
+    });
+    document.getElementById('diarioPrev').onclick = () => { if (diarioPage>1){ diarioPage--; drawDiarioTable(); } };
+    document.getElementById('diarioNext').onclick = () => { diarioPage++; drawDiarioTable(); };
+    drawDiarioTable();
+  }
+
+  function drawDiarioTable(){
+    let rows = diarioRowsCache;
+    if (diarioSearch){
+      rows = rows.filter(r => r.produto.toLowerCase().includes(diarioSearch));
+    }
+    // aggregate by day+loja+produto (in case of duplicate lines for same product/day/store)
+    const agg = new Map();
+    rows.forEach(r => {
+      const key = isoDate(r.data) + '|' + r.loja + '|' + r.produto;
+      if (!agg.has(key)) agg.set(key, { data: r.data, loja: r.loja, produto: r.produto, categoria: r.categoria, qtd: 0, valor: 0 });
+      const a = agg.get(key);
+      a.qtd += r.qtd; a.valor += r.valor;
+    });
+    let list = [...agg.values()];
+
+    const dir = diarioSort.dir === 'asc' ? 1 : -1;
+    list.sort((a,b) => {
+      const k = diarioSort.key;
+      let va = a[k], vb = b[k];
+      if (k === 'data') { va = a.data.getTime(); vb = b.data.getTime(); }
+      if (typeof va === 'string') return va.localeCompare(vb) * dir;
+      return (va - vb) * dir;
+    });
+
+    document.querySelectorAll('#tableDiario thead th').forEach(th => {
+      th.classList.remove('sorted','sorted-asc');
+      if (th.dataset.key === diarioSort.key) th.classList.add(diarioSort.dir === 'desc' ? 'sorted' : 'sorted-asc');
+    });
+
+    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    diarioPage = Math.min(diarioPage, totalPages);
+    const pageRows = list.slice((diarioPage-1)*PAGE_SIZE, diarioPage*PAGE_SIZE);
+
+    const tbody = document.querySelector('#tableDiario tbody');
+    tbody.innerHTML = pageRows.map(r => `
+      <tr>
+        <td>${fmtDate(r.data)}</td>
+        <td>${escapeHtml(r.loja)}</td>
+        <td>${escapeHtml(r.produto)}</td>
+        <td>${escapeHtml(r.categoria)}</td>
+        <td>${num(r.qtd)}</td>
+        <td>${money(r.valor)}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;">Nenhum registro encontrado</td></tr>`;
+
+    document.getElementById('diarioCount').textContent = num(list.length) + ' linhas';
+    document.getElementById('diarioPageLabel').textContent = `${diarioPage} / ${totalPages}`;
+    document.getElementById('diarioPrev').disabled = diarioPage <= 1;
+    document.getElementById('diarioNext').disabled = diarioPage >= totalPages;
+  }
+
+  // ---------------- TAB 2: Itens mais vendidos ----------------
+  function renderItensTab(){
+    const rows = getFilteredRecords();
+    const lojaFiltro = document.getElementById('itensLojaSel').value;
+    const catFiltro = document.getElementById('itensCategoriaSel').value;
+    const metrica = document.getElementById('itensMetricaSel').value;
+
+    let scoped = rows;
+    if (lojaFiltro !== '__all__') scoped = scoped.filter(r => r.loja === lojaFiltro);
+    if (catFiltro !== '__all__') scoped = scoped.filter(r => r.categoria === catFiltro);
+
+    // rank by product
+    const byProduct = new Map();
+    scoped.forEach(r => {
+      if (!byProduct.has(r.produto)) byProduct.set(r.produto, { produto: r.produto, qtd:0, valor:0 });
+      const p = byProduct.get(r.produto);
+      p.qtd += r.qtd; p.valor += r.valor;
+    });
+    let list = [...byProduct.values()].sort((a,b) => b[metrica] - a[metrica]).slice(0,10);
+    const max = list.length ? list[0][metrica] : 1;
+
+    const rankEl = document.getElementById('rankItens');
+    rankEl.innerHTML = list.map((p,i) => `
+      <div class="rank-row">
+        <div class="rank-idx">${i+1}</div>
+        <div class="rank-bar-wrap">
+          <div class="rank-bar" style="width:${max ? (p[metrica]/max*100) : 0}%"></div>
+          <div class="rank-label">${escapeHtml(p.produto)}</div>
+        </div>
+        <div class="rank-value">${metrica==='qtd' ? num(p.qtd)+' un.' : money(p.valor)}</div>
+      </div>
+    `).join('') || `<div style="color:var(--muted);">Nenhum item no filtro atual.</div>`;
+
+    // category pie
+    const byCat = new Map();
+    scoped.forEach(r => { byCat.set(r.categoria, (byCat.get(r.categoria)||0) + r.valor); });
+    const catEntries = [...byCat.entries()].sort((a,b)=>b[1]-a[1]);
+    if (chartCategoriaPie) chartCategoriaPie.destroy();
+    chartCategoriaPie = new Chart(document.getElementById('chartCategoriaPie'), {
+      type: 'doughnut',
+      data: {
+        labels: catEntries.map(e=>e[0]),
+        datasets: [{ data: catEntries.map(e=>+e[1].toFixed(2)), backgroundColor: catEntries.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor: '#1A1836', borderWidth: 2 }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend: { position:'right', labels:{ color:'#F4F3FF', boxWidth:10, font:{size:11} } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${money(ctx.parsed)}` } }
+        }
+      }
+    });
+
+    // top per store grid (always across all 3 stores, respecting category filter + date/status filters, ignoring loja selector)
+    let baseForStores = rows;
+    if (catFiltro !== '__all__') baseForStores = baseForStores.filter(r => r.categoria === catFiltro);
+    const grid = document.getElementById('topPorLojaGrid');
+    grid.innerHTML = STORES.map((loja, i) => {
+      const storeRows = baseForStores.filter(r => r.loja === loja);
+      const byP = new Map();
+      storeRows.forEach(r => {
+        if (!byP.has(r.produto)) byP.set(r.produto, {produto:r.produto, qtd:0, valor:0});
+        const p = byP.get(r.produto); p.qtd += r.qtd; p.valor += r.valor;
+      });
+      const top = [...byP.values()].sort((a,b)=>b.qtd-a.qtd)[0];
+      return `
+        <div style="background:var(--panel-alt);border:1px solid var(--border);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:${STORE_COLORS[i%STORE_COLORS.length]};font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">${escapeHtml(loja)}</div>
+          ${top ? `
+            <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${escapeHtml(top.produto)}</div>
+            <div style="font-size:12px;color:var(--muted);">${num(top.qtd)} un. vendidas · ${money(top.valor)}</div>
+          ` : `<div style="color:var(--muted);font-size:13px;">Sem vendas no filtro</div>`}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ---------------- TAB 3: Consolidado ----------------
+  document.querySelectorAll('#granularidadeSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#granularidadeSeg button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      granularity = btn.dataset.g;
+      renderConsolidadoTab(getFilteredRecords());
+    });
+  });
+
+  function periodKey(d, gran){
+    if (gran === 'dia') return { key: isoDate(d), label: fmtDate(d), sort: d.getTime() };
+    if (gran === 'semana'){
+      const {week, year} = isoWeek(d);
+      return { key: `${year}-W${pad2(week)}`, label: `Sem ${pad2(week)}/${year}`, sort: year*100+week };
+    }
+    if (gran === 'mes'){
+      const y = d.getFullYear(), m = d.getMonth();
+      const label = d.toLocaleDateString('pt-BR', {month:'short', year:'numeric'});
+      return { key: `${y}-${pad2(m+1)}`, label, sort: y*100+m };
+    }
+    const y = d.getFullYear();
+    return { key: String(y), label: String(y), sort: y };
+  }
+
+  function renderConsolidadoTab(rows){
+    const map = new Map();
+    rows.forEach(r => {
+      const pk = periodKey(r.data, granularity);
+      if (!map.has(pk.key)) map.set(pk.key, { label: pk.label, sort: pk.sort, qtd:0, valor:0, transacoes: new Set() });
+      const m = map.get(pk.key);
+      m.qtd += r.qtd; m.valor += r.valor; m.transacoes.add(r.transacao);
+    });
+    const list = [...map.values()].sort((a,b) => a.sort - b.sort);
+
+    if (chartConsolidado) chartConsolidado.destroy();
+    chartConsolidado = new Chart(document.getElementById('chartConsolidado'), {
+      data: {
+        labels: list.map(l=>l.label),
+        datasets: [
+          { type:'bar', label:'Valor (R$)', data: list.map(l=>+l.valor.toFixed(2)), backgroundColor:'#7B5CF5', borderRadius:4, yAxisID:'y',
+            showValueLabel:true, valueLabelFormatter: v => 'R$ ' + Math.round(v).toLocaleString('pt-BR'), valueLabelColor:'#FFFFFF' },
+          { type:'line', label:'Quantidade', data: list.map(l=>l.qtd), borderColor:'#FFB648', backgroundColor:'#FFB648', tension:.3, yAxisID:'y1', pointRadius:3,
+            showValueLabel:true, valueLabelFormatter: v => num(v), valueLabelColor:'#FFB648' },
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        layout: { padding: { top: 22 } },
+        scales: {
+          x: { ticks:{ color:'#9D9AC7' }, grid:{ display:false } },
+          y: { position:'left', display:false, grace:'15%' },
+          y1: { position:'right', display:false, grace:'25%' },
+        },
+        plugins: {
+          legend: { labels:{ color:'#F4F3FF', boxWidth:10 } },
+          tooltip: { callbacks: { label: (ctx) => ctx.dataset.label === 'Valor (R$)' ? `Valor: ${money(ctx.parsed.y)}` : `Quantidade: ${num(ctx.parsed.y)}` } }
+        }
+      }
+    });
+
+    const gLabel = {dia:'dia', semana:'semana', mes:'mês', ano:'ano'}[granularity];
+    document.getElementById('descConsolidado').textContent = `Quantidade e valor agregados por ${gLabel}`;
+    document.getElementById('descConsolidadoTable').textContent = `Totais por ${gLabel}`;
+
+    const tbody = document.querySelector('#tableConsolidado tbody');
+    tbody.innerHTML = [...list].sort((a,b)=>b.sort-a.sort).map(l => `
+      <tr><td>${escapeHtml(l.label)}</td><td>${num(l.qtd)}</td><td>${money(l.valor)}</td><td>${num(l.transacoes.size)}</td></tr>
+    `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">Sem dados</td></tr>`;
+
+    // top itens no periodo filtrado (overall, not per sub-period)
+    const byP = new Map();
+    rows.forEach(r => {
+      if (!byP.has(r.produto)) byP.set(r.produto, {produto:r.produto, qtd:0, valor:0});
+      const p = byP.get(r.produto); p.qtd += r.qtd; p.valor += r.valor;
+    });
+    const top = [...byP.values()].sort((a,b)=>b.qtd-a.qtd).slice(0,8);
+    const max = top.length ? top[0].qtd : 1;
+    document.getElementById('rankConsolidadoItens').innerHTML = top.map((p,i) => `
+      <div class="rank-row">
+        <div class="rank-idx">${i+1}</div>
+        <div class="rank-bar-wrap">
+          <div class="rank-bar" style="width:${max ? (p.qtd/max*100):0}%"></div>
+          <div class="rank-label">${escapeHtml(p.produto)}</div>
+        </div>
+        <div class="rank-value">${num(p.qtd)} un.</div>
+      </div>
+    `).join('') || `<div style="color:var(--muted);">Sem dados no período.</div>`;
+  }
+
+  // ---------------- TAB 4: Rentabilidade ----------------
+  function renderRentabilidadeTab(rows){
+    const container = document.getElementById('rentabilidadeContent');
+
+    if (!COST_AVAILABLE){
+      container.innerHTML = `
+        <div class="panel">
+          <div class="no-cost-msg">
+            Não encontrei a coluna de custo ("Último preço de compra un.") na planilha carregada,
+            então não dá pra calcular lucro e margem. As demais abas continuam funcionando normalmente.
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ---- per-product aggregation (respects current filters: loja/categoria/data/status) ----
+    const byProduct = new Map();
+    let receita = 0, custo = 0, qtdTotal = 0;
+    const transacoes = new Set();
+    const clientes = new Set();
+    rows.forEach(r => {
+      receita += r.valor;
+      qtdTotal += r.qtd;
+      transacoes.add(r.transacao);
+      if (r.cliente) clientes.add(r.cliente);
+      const custoLinha = (r.custoUnit != null ? r.custoUnit : 0) * r.qtd;
+      custo += custoLinha;
+      if (!byProduct.has(r.produto)) byProduct.set(r.produto, { produto:r.produto, receita:0, custo:0, qtd:0 });
+      const p = byProduct.get(r.produto);
+      p.receita += r.valor; p.custo += custoLinha; p.qtd += r.qtd;
+    });
+    const lucro = receita - custo;
+    const margemPct = receita ? (lucro/receita*100) : 0;
+    const ticket = transacoes.size ? receita/transacoes.size : 0;
+
+    // ---- KPI cards ----
+    const kpiHtml = `
+      <div class="kpi-grid-7">
+        <div class="kpi-card accent"><div class="label">Receita</div><div class="value">${money(receita)}</div><div class="sub">valor vendido no filtro</div></div>
+        <div class="kpi-card"><div class="label">Lucro bruto</div><div class="value">${money(lucro)}</div><div class="sub">receita − custo dos produtos</div></div>
+        <div class="kpi-card"><div class="label">Margem</div><div class="value">${margemPct.toFixed(1)}%</div><div class="sub">lucro ÷ receita</div></div>
+        <div class="kpi-card"><div class="label">Qtd. de vendas</div><div class="value">${num(transacoes.size)}</div><div class="sub">nº de cupons</div></div>
+        <div class="kpi-card"><div class="label">Ticket médio</div><div class="value">${money(ticket)}</div><div class="sub">receita ÷ nº de vendas</div></div>
+        <div class="kpi-card"><div class="label">Produtos vendidos</div><div class="value">${num(qtdTotal)}</div><div class="sub">quantidade de itens</div></div>
+        <div class="kpi-card"><div class="label">Clientes únicos</div><div class="value">${num(clientes.size)}</div><div class="sub">identificados na base</div></div>
+      </div>`;
+
+    // ---- margin ranking (min. 3 units sold, to avoid one-off outliers) ----
+    const MIN_QTD = 3;
+    const withMargin = [...byProduct.values()]
+      .filter(p => p.qtd >= MIN_QTD && p.receita > 0)
+      .map(p => ({ ...p, margemPct: (p.receita - p.custo) / p.receita * 100 }));
+    const maiorMargem = [...withMargin].sort((a,b) => b.margemPct - a.margemPct).slice(0,10);
+    const menorMargem = [...withMargin].sort((a,b) => a.margemPct - b.margemPct).slice(0,10);
+
+    const marginRow = (p, badgeClass) => `
+      <div class="rank-row">
+        <span class="mono-badge ${badgeClass}">${p.margemPct.toFixed(0)}%</span>
+        <div class="rank-bar-wrap" style="flex:1;">
+          <div class="rank-bar" style="width:${Math.min(100, Math.max(4, Math.abs(p.margemPct)))}%"></div>
+          <div class="rank-label">${escapeHtml(p.produto)}</div>
+        </div>
+        <div class="rank-value">${num(p.qtd)} un. · ${money(p.receita)}</div>
+      </div>`;
+
+    // ---- stale products (no sale in the last N days, ignoring the date filter, but respecting loja/categoria) ----
+    const staleScope = RAW.filter(r => {
+      if (!selectedStores.has(r.loja)) return false;
+      if (!selectedCategories.has(r.categoria)) return false;
+      if (r.status.toLowerCase().startsWith('cancel')) return false;
+      return true;
+    });
+    const lastSaleByProduct = new Map();
+    staleScope.forEach(r => {
+      const cur = lastSaleByProduct.get(r.produto);
+      if (!cur || r.data > cur.data) lastSaleByProduct.set(r.produto, { data: r.data, loja: r.loja });
+    });
+    const staleList = [...lastSaleByProduct.entries()].map(([produto, info]) => ({
+      produto, ultimaVenda: info.data, loja: info.loja,
+      diasSemVenda: Math.round((REFERENCE_DATE - info.data) / 86400000),
+    })).filter(p => p.diasSemVenda >= staleDaysThreshold).sort((a,b) => b.diasSemVenda - a.diasSemVenda);
+
+    container.innerHTML = `
+      ${kpiHtml}
+      <div class="grid-2" style="margin-top:20px;">
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Produtos com maior margem</h3><div class="desc">Top 10 · mínimo ${MIN_QTD} unidades vendidas no filtro atual</div></div>
+          </div>
+          <div class="rank-list">${maiorMargem.map(p => marginRow(p,'badge-high')).join('') || '<div style="color:var(--muted);">Sem produtos suficientes no filtro.</div>'}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Produtos com menor margem</h3><div class="desc">Top 10 · mínimo ${MIN_QTD} unidades vendidas no filtro atual</div></div>
+          </div>
+          <div class="rank-list">${menorMargem.map(p => marginRow(p,'badge-low')).join('') || '<div style="color:var(--muted);">Sem produtos suficientes no filtro.</div>'}</div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head">
+          <div><h3>Produtos sem venda há X dias</h3><div class="desc">Considera lojas/categorias filtradas acima, mas ignora o período de data — referência: ${fmtDate(REFERENCE_DATE)} (data mais recente da base)</div></div>
+          <div class="inline-input">
+            <span>sem venda há pelo menos</span>
+            <input type="number" id="staleDaysInput" min="1" value="${staleDaysThreshold}">
+            <span>dia(s)</span>
+          </div>
+        </div>
+        <div class="table-scroll" style="max-height:340px;">
+          <table>
+            <thead><tr><th>Produto</th><th>Última loja</th><th>Última venda</th><th>Dias sem venda</th></tr></thead>
+            <tbody>
+              ${staleList.map(p => `
+                <tr>
+                  <td>${escapeHtml(p.produto)}</td>
+                  <td>${escapeHtml(p.loja)}</td>
+                  <td>${fmtDate(p.ultimaVenda)}</td>
+                  <td><span class="mono-badge badge-stale">${p.diasSemVenda}d</span></td>
+                </tr>
+              `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">Nenhum produto parado por ${staleDaysThreshold}+ dias nesse filtro.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('staleDaysInput').addEventListener('change', (e) => {
+      const v = parseInt(e.target.value, 10);
+      staleDaysThreshold = isNaN(v) || v < 1 ? 1 : v;
+      renderRentabilidadeTab(getFilteredRecords());
+    });
+  }
+
+  // ---------------- TAB 5: Cancelados ----------------
+  function renderCanceladosTab(){
+    const container = document.getElementById('canceladosContent');
+    const cancelRows = getCanceladosRecords();
+    const allRows = getAllRecordsIgnoringStatus();
+
+    const valorCancelado = cancelRows.reduce((s,r)=>s+r.valor, 0);
+    const qtdCancelada = cancelRows.reduce((s,r)=>s+r.qtd, 0);
+    const transacoesCanceladas = new Set(cancelRows.map(r=>r.transacao)).size;
+    const valorTotalGeral = allRows.reduce((s,r)=>s+r.valor, 0);
+    const taxaCancelamento = valorTotalGeral ? (valorCancelado/valorTotalGeral*100) : 0;
+    const ticketCancelado = transacoesCanceladas ? valorCancelado/transacoesCanceladas : 0;
+
+    const kpiHtml = `
+      <div class="kpi-grid">
+        <div class="kpi-card accent"><div class="label">Valor cancelado</div><div class="value">${money(valorCancelado)}</div><div class="sub">no período filtrado</div></div>
+        <div class="kpi-card"><div class="label">Quantidade cancelada</div><div class="value">${num(qtdCancelada)}</div><div class="sub">unidades</div></div>
+        <div class="kpi-card"><div class="label">Transações canceladas</div><div class="value">${num(transacoesCanceladas)}</div><div class="sub">ticket médio ${money(ticketCancelado)}</div></div>
+        <div class="kpi-card"><div class="label">Taxa de cancelamento</div><div class="value">${taxaCancelamento.toFixed(1)}%</div><div class="sub">sobre o valor total (Paga + Cancelada)</div></div>
+      </div>`;
+
+    if (!cancelRows.length){
+      container.innerHTML = kpiHtml + `
+        <div class="panel" style="margin-top:20px;">
+          <div class="no-cost-msg">Nenhuma venda cancelada encontrada no filtro atual.</div>
+        </div>`;
+      return;
+    }
+
+    if (!PAYMENT_AVAILABLE){
+      container.innerHTML = kpiHtml + `
+        <div class="panel" style="margin-top:20px;">
+          <div class="no-cost-msg">
+            Não encontrei a coluna "Forma de Pagamento" na planilha, então não dá pra detalhar os
+            cancelamentos por forma de pagamento. Os totais acima continuam corretos.
+          </div>
+        </div>`;
+      return;
+    }
+
+    // ---- by payment method ----
+    const byPag = new Map();
+    cancelRows.forEach(r => {
+      if (!byPag.has(r.pagamento)) byPag.set(r.pagamento, { pagamento:r.pagamento, qtd:0, valor:0, transacoes:new Set() });
+      const p = byPag.get(r.pagamento);
+      p.qtd += r.qtd; p.valor += r.valor; p.transacoes.add(r.transacao);
+    });
+    const pagList = [...byPag.values()].sort((a,b) => b.valor - a.valor);
+
+    const pagTableRows = pagList.map(p => `
+      <tr>
+        <td>${escapeHtml(p.pagamento)}</td>
+        <td>${num(p.transacoes.size)}</td>
+        <td>${num(p.qtd)}</td>
+        <td>${money(p.valor)}</td>
+        <td>${(valorCancelado ? p.valor/valorCancelado*100 : 0).toFixed(1)}%</td>
+      </tr>
+    `).join('');
+
+    // ---- granularity block ----
+    const gLabel = {dia:'dia', mes:'mês', ano:'ano'}[cancelGranularity];
+    const map = new Map();
+    const pagamentos = [...byPag.keys()];
+    cancelRows.forEach(r => {
+      const pk = periodKey(r.data, cancelGranularity);
+      if (!map.has(pk.key)) map.set(pk.key, { label: pk.label, sort: pk.sort, valor:0, qtd:0, transacoes:new Set(), porPagamento:{} });
+      const m = map.get(pk.key);
+      m.valor += r.valor; m.qtd += r.qtd; m.transacoes.add(r.transacao);
+      m.porPagamento[r.pagamento] = (m.porPagamento[r.pagamento]||0) + r.valor;
+    });
+    const periodList = [...map.values()].sort((a,b)=>a.sort-b.sort);
+
+    const datasets = pagamentos.map((pg, i) => ({
+      label: pg,
+      data: periodList.map(p => +(p.porPagamento[pg]||0).toFixed(2)),
+      backgroundColor: PALETTE[i % PALETTE.length],
+      stack: 'v',
+      borderRadius: 3,
+      showValueLabel: true,
+      valueLabelFormatter: v => 'R$ ' + Math.round(v).toLocaleString('pt-BR'),
+      valueLabelColor: '#FFFFFF',
+    }));
+
+    container.innerHTML = `
+      ${kpiHtml}
+      <div class="grid-2" style="margin-top:20px;">
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Cancelamentos por forma de pagamento</h3><div class="desc">Valor, quantidade e participação no total cancelado</div></div>
+          </div>
+          <div class="table-scroll" style="max-height:300px;">
+            <table>
+              <thead><tr><th>Forma de pagamento</th><th>Transações</th><th>Qtd.</th><th>Valor</th><th>% do cancelado</th></tr></thead>
+              <tbody>${pagTableRows}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Participação por forma de pagamento</h3><div class="desc">Sobre o valor cancelado</div></div>
+          </div>
+          <div class="chart-wrap" style="height:280px;"><canvas id="chartPagamentoPie"></canvas></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head">
+          <div>
+            <h3>Cancelamentos consolidados</h3>
+            <div class="desc">Valor cancelado por ${gLabel}, detalhado por forma de pagamento</div>
+          </div>
+          <div class="segmented" id="cancelGranularidadeSeg">
+            <button data-g="dia" class="${cancelGranularity==='dia'?'active':''}">Dia</button>
+            <button data-g="mes" class="${cancelGranularity==='mes'?'active':''}">Mês</button>
+            <button data-g="ano" class="${cancelGranularity==='ano'?'active':''}">Ano</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartCancelados"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Tabela consolidada de cancelamentos</h3><div class="desc">Totais por ${gLabel}</div></div>
+        </div>
+        <div class="table-scroll" style="max-height:320px;">
+          <table>
+            <thead><tr><th>Período</th><th>Qtd.</th><th>Valor</th><th>Transações</th></tr></thead>
+            <tbody>
+              ${[...periodList].sort((a,b)=>b.sort-a.sort).map(p => `
+                <tr><td>${escapeHtml(p.label)}</td><td>${num(p.qtd)}</td><td>${money(p.valor)}</td><td>${num(p.transacoes.size)}</td></tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.querySelectorAll('#cancelGranularidadeSeg button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        cancelGranularity = btn.dataset.g;
+        renderCanceladosTab();
+      });
+    });
+
+    if (chartPagamentoPie) chartPagamentoPie.destroy();
+    chartPagamentoPie = new Chart(document.getElementById('chartPagamentoPie'), {
+      type: 'doughnut',
+      data: {
+        labels: pagList.map(p=>p.pagamento),
+        datasets: [{ data: pagList.map(p=>+p.valor.toFixed(2)), backgroundColor: pagList.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#1A1836', borderWidth:2 }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend: { position:'right', labels:{ color:'#F4F3FF', boxWidth:10, font:{size:11} } },
+          tooltip: { callbacks: { label:(ctx)=>`${ctx.label}: ${money(ctx.parsed)}` } }
+        }
+      }
+    });
+
+    if (chartCancelados) chartCancelados.destroy();
+    chartCancelados = new Chart(document.getElementById('chartCancelados'), {
+      type: 'bar',
+      data: { labels: periodList.map(p=>p.label), datasets },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        layout: { padding: { top: 18 } },
+        scales: {
+          x: { stacked:true, ticks:{ color:'#9D9AC7', maxRotation:60, minRotation:0 }, grid:{ display:false } },
+          y: { stacked:true, display:false, grace:'12%' },
+        },
+        plugins: {
+          legend: { labels:{ color:'#F4F3FF', boxWidth:10 } },
+          tooltip: { callbacks: { label:(ctx)=>`${ctx.dataset.label}: ${money(ctx.parsed.y)}` } }
+        }
+      }
+    });
+  }
+
+  // ---------------- TAB 6: Ticket por Horário ----------------
+  function buildTransacoesFromRows(rows){
+    const map = new Map();
+    rows.forEach(r => {
+      if (!map.has(r.transacao)) map.set(r.transacao, { transacao:r.transacao, data:r.data, dataHora:r.dataHora, hora:r.hora, loja:r.loja, valor:0, itens:0 });
+      const t = map.get(r.transacao);
+      t.valor += r.valor;
+      t.itens += r.qtd;
+    });
+    return [...map.values()];
+  }
+
+  function heatColor(ratio){
+    const c1 = [33,31,69], c2 = [123,92,245];
+    const r = Math.round(c1[0] + (c2[0]-c1[0])*ratio);
+    const g = Math.round(c1[1] + (c2[1]-c1[1])*ratio);
+    const b = Math.round(c1[2] + (c2[2]-c1[2])*ratio);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function renderTicketHorarioTab(){
+    const container = document.getElementById('ticketHorarioContent');
+    const allTransacoes = buildTransacoesFromRows(getFilteredRecords());
+    const scoped = ticketLojaFiltro === '__all__' ? allTransacoes : allTransacoes.filter(t => t.loja === ticketLojaFiltro);
+
+    const valorTotal = scoped.reduce((s,t)=>s+t.valor, 0);
+    const nTransacoes = scoped.length;
+    const ticketMedio = nTransacoes ? valorTotal/nTransacoes : 0;
+
+    const byHour = new Map();
+    scoped.forEach(t => byHour.set(t.hora, (byHour.get(t.hora)||0) + t.valor));
+    let peakHour = null, peakVal = -1;
+    byHour.forEach((v,h) => { if (v > peakVal){ peakVal = v; peakHour = h; } });
+
+    const kpiHtml = `
+      <div class="kpi-grid">
+        <div class="kpi-card accent"><div class="label">Valor total</div><div class="value">${money(valorTotal)}</div><div class="sub">soma das transações no filtro</div></div>
+        <div class="kpi-card"><div class="label">Transações</div><div class="value">${num(nTransacoes)}</div><div class="sub">cupons únicos</div></div>
+        <div class="kpi-card"><div class="label">Ticket médio</div><div class="value">${money(ticketMedio)}</div><div class="sub">valor total ÷ transações</div></div>
+        <div class="kpi-card"><div class="label">Horário de pico</div><div class="value">${peakHour!=null ? pad2(peakHour)+':00' : '—'}</div><div class="sub">maior valor total vendido</div></div>
+      </div>`;
+
+    const storeSelectHtml = `
+      <select class="select-inline" id="ticketLojaSel">
+        <option value="__all__" ${ticketLojaFiltro==='__all__'?'selected':''}>Todas as lojas</option>
+        ${STORES.map(s => `<option value="${escapeHtml(s)}" ${ticketLojaFiltro===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+      </select>`;
+
+    if (!scoped.length){
+      container.innerHTML = kpiHtml + `
+        <div class="panel" style="margin-top:20px;">
+          <div class="panel-head"><div><h3>Ticket médio por horário e dia da semana</h3></div>${storeSelectHtml}</div>
+          <div class="no-cost-msg">Sem transações no filtro atual.</div>
+        </div>`;
+      document.getElementById('ticketLojaSel').addEventListener('change', (e) => { ticketLojaFiltro = e.target.value; ticketPage = 1; renderTicketHorarioTab(); });
+      return;
+    }
+
+    // ---- heatmap: hour x weekday ----
+    const cellMap = new Map();
+    scoped.forEach(t => {
+      const key = t.hora + '|' + t.data.getDay();
+      if (!cellMap.has(key)) cellMap.set(key, { valor:0, n:0 });
+      const c = cellMap.get(key);
+      c.valor += t.valor; c.n += 1;
+    });
+    let minHour = 23, maxHour = 0;
+    scoped.forEach(t => { if (t.hora < minHour) minHour = t.hora; if (t.hora > maxHour) maxHour = t.hora; });
+    let maxCellTicket = 0;
+    cellMap.forEach(c => { const avg = c.valor/c.n; if (avg > maxCellTicket) maxCellTicket = avg; });
+
+    const weekdays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    let heatmapHtml = '<table class="heatmap"><thead><tr><th></th>' + weekdays.map(w=>`<th>${w}</th>`).join('') + '</tr></thead><tbody>';
+    for (let h = minHour; h <= maxHour; h++){
+      heatmapHtml += `<tr><th class="hour-label">${pad2(h)}:00</th>`;
+      for (let wd = 0; wd < 7; wd++){
+        const c = cellMap.get(h + '|' + wd);
+        if (c && c.n > 0){
+          const avg = c.valor / c.n;
+          const ratio = maxCellTicket ? avg / maxCellTicket : 0;
+          heatmapHtml += `<td style="background:${heatColor(ratio)}" title="${c.n} venda(s) — total ${money(c.valor)}">${money(avg)}<span class="cnt">${c.n} venda${c.n>1?'s':''}</span></td>`;
+        } else {
+          heatmapHtml += `<td class="empty">—</td>`;
+        }
+      }
+      heatmapHtml += '</tr>';
+    }
+    heatmapHtml += '</tbody></table>';
+
+    // ---- detail table: day + hour + loja ----
+    const detailMap = new Map();
+    scoped.forEach(t => {
+      const key = isoDate(t.data) + '|' + t.hora + '|' + t.loja;
+      if (!detailMap.has(key)) detailMap.set(key, { data:t.data, hora:t.hora, loja:t.loja, n:0, valor:0 });
+      const d = detailMap.get(key);
+      d.n += 1; d.valor += t.valor;
+    });
+    let detailList = [...detailMap.values()].map(d => ({ ...d, ticket: d.n ? d.valor/d.n : 0 }));
+
+    const dir = ticketSort.dir === 'asc' ? 1 : -1;
+    detailList.sort((a,b) => {
+      let va, vb;
+      if (ticketSort.key === 'data'){ va = a.data.getTime()*100 + a.hora; vb = b.data.getTime()*100 + b.hora; }
+      else if (ticketSort.key === 'loja'){ va = a.loja; vb = b.loja; }
+      else { va = a[ticketSort.key]; vb = b[ticketSort.key]; }
+      if (typeof va === 'string') return va.localeCompare(vb) * dir;
+      return (va - vb) * dir;
+    });
+
+    const totalPages = Math.max(1, Math.ceil(detailList.length / PAGE_SIZE));
+    ticketPage = Math.min(ticketPage, totalPages);
+    const pageRows = detailList.slice((ticketPage-1)*PAGE_SIZE, ticketPage*PAGE_SIZE);
+
+    // ---- line-by-line transaction feed (most recent first) ----
+    const FEED_LIMIT = 200;
+    const feedAll = [...scoped].sort((a,b) => b.dataHora - a.dataHora);
+    const feedRows = feedAll.slice(0, FEED_LIMIT);
+    const feedHtml = feedRows.map(t => `
+      <tr>
+        <td>${fmtDate(t.data)}<br><span style="color:var(--muted);font-size:11px;">${pad2(t.dataHora.getHours())}:${pad2(t.dataHora.getMinutes())}:${pad2(t.dataHora.getSeconds())}</span></td>
+        <td>${escapeHtml(t.loja)}</td>
+        <td>${num(t.itens)}</td>
+        <td>${money(t.valor)}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Sem transações</td></tr>`;
+
+    container.innerHTML = `
+      ${kpiHtml}
+      <div class="grid-2" style="margin-top:20px;align-items:start;">
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Ticket médio por horário e dia da semana</h3><div class="desc">Cor mais forte = ticket médio mais alto · número pequeno = quantidade de vendas</div></div>
+            ${storeSelectHtml}
+          </div>
+          <div class="heatmap-wrap">${heatmapHtml}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Transações</h3><div class="desc">Linha a linha, mais recentes primeiro${feedAll.length > FEED_LIMIT ? ` · mostrando ${FEED_LIMIT} de ${num(feedAll.length)}` : ''}</div></div>
+          </div>
+          <div class="table-scroll" style="max-height:560px;">
+            <table>
+              <thead><tr><th>Data / Horário</th><th>Loja</th><th>Itens</th><th>Valor</th></tr></thead>
+              <tbody>${feedHtml}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Detalhe por dia, horário e loja</h3><div class="desc">Valor por transação realizada, agrupado por dia, horário e loja</div></div>
+        </div>
+        <div class="table-scroll">
+          <table id="tableTicketHorario">
+            <thead>
+              <tr>
+                <th data-key="data">Data</th>
+                <th data-key="hora">Horário</th>
+                <th data-key="loja">Loja</th>
+                <th data-key="n">Transações</th>
+                <th data-key="valor">Valor Total</th>
+                <th data-key="ticket">Ticket Médio</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pageRows.map(d => `
+                <tr>
+                  <td>${fmtDate(d.data)}</td>
+                  <td>${pad2(d.hora)}:00</td>
+                  <td>${escapeHtml(d.loja)}</td>
+                  <td>${num(d.n)}</td>
+                  <td>${money(d.valor)}</td>
+                  <td>${money(d.ticket)}</td>
+                </tr>
+              `).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Sem dados</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-foot">
+          <span>${num(detailList.length)} linhas</span>
+          <div class="pager">
+            <button id="ticketPrev">‹ Anterior</button>
+            <span id="ticketPageLabel">${ticketPage} / ${totalPages}</span>
+            <button id="ticketNext">Próxima ›</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('ticketLojaSel').addEventListener('change', (e) => {
+      ticketLojaFiltro = e.target.value; ticketPage = 1; renderTicketHorarioTab();
+    });
+    document.querySelectorAll('#tableTicketHorario thead th').forEach(th => {
+      if (th.dataset.key === ticketSort.key) th.classList.add(ticketSort.dir === 'desc' ? 'sorted' : 'sorted-asc');
+      th.onclick = () => {
+        const key = th.dataset.key;
+        if (ticketSort.key === key) ticketSort.dir = ticketSort.dir === 'asc' ? 'desc' : 'asc';
+        else { ticketSort.key = key; ticketSort.dir = 'desc'; }
+        ticketPage = 1;
+        renderTicketHorarioTab();
+      };
+    });
+    document.getElementById('ticketPrev').onclick = () => { if (ticketPage>1){ ticketPage--; renderTicketHorarioTab(); } };
+    document.getElementById('ticketNext').onclick = () => { ticketPage++; renderTicketHorarioTab(); };
+  }
+
+  // ---------------- Export PNG ----------------
+  document.getElementById('btnExport').addEventListener('click', () => {
+    const activePanel = document.querySelector('.tab-panel.active');
+    html2canvas(activePanel, { backgroundColor: '#100F26', scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'controle-mercado-' + new Date().toISOString().slice(0,10) + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  });
+
+  // ---------------- Export Excel (com gráficos) ----------------
+  function sanitizeSheetName(name){
+    return name.replace(/[\\/?*[\]:]/g, '').slice(0, 31);
+  }
+
+  function addDataSheet(wb, name, header, rows){
+    const ws = wb.addWorksheet(sanitizeSheetName(name));
+    const headerRow = ws.addRow(header);
+    headerRow.eachCell(c => {
+      c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF211F45' } };
+    });
+    rows.forEach(r => ws.addRow(r));
+    ws.columns.forEach(col => { col.width = 24; });
+    return ws;
+  }
+
+  function addImageSheet(wb, name, imgData){
+    const ws = wb.addWorksheet(sanitizeSheetName(name));
+    if (!imgData){
+      ws.addRow(['Gráfico não disponível para o filtro atual.']);
+      return;
+    }
+    const imgId = wb.addImage({ base64: imgData.base64, extension: 'png' });
+    ws.addImage(imgId, { tl: { col: 0, row: 0 }, ext: { width: imgData.width, height: imgData.height } });
+  }
+
+  function buildDetalheSheet(wb, rows){
+    const sorted = [...rows].sort((a,b) => a.data - b.data);
+    const data = sorted.map(r => [fmtDate(r.data), r.loja, r.produto, r.categoria, r.qtd, +r.valor.toFixed(2), r.status, r.pagamento]);
+    addDataSheet(wb, 'Detalhe de Vendas', ['Data','Loja','Produto','Categoria','Qtd.','Valor Total','Status','Forma de Pagamento'], data);
+  }
+
+  function buildItensSheet(wb, rows){
+    const byProduct = new Map();
+    rows.forEach(r => {
+      if (!byProduct.has(r.produto)) byProduct.set(r.produto, { produto:r.produto, categoria:r.categoria, qtd:0, valor:0 });
+      const p = byProduct.get(r.produto);
+      p.qtd += r.qtd; p.valor += r.valor;
+    });
+    const list = [...byProduct.values()].sort((a,b) => b.qtd - a.qtd);
+    addDataSheet(wb, 'Itens Mais Vendidos', ['Produto','Categoria','Qtd. Vendida','Valor Total'], list.map(p => [p.produto, p.categoria, p.qtd, +p.valor.toFixed(2)]));
+  }
+
+  function buildConsolidadoSheet(wb, rows){
+    const map = new Map();
+    rows.forEach(r => {
+      const pk = periodKey(r.data, granularity);
+      if (!map.has(pk.key)) map.set(pk.key, { label: pk.label, sort: pk.sort, qtd:0, valor:0, transacoes: new Set() });
+      const m = map.get(pk.key);
+      m.qtd += r.qtd; m.valor += r.valor; m.transacoes.add(r.transacao);
+    });
+    const list = [...map.values()].sort((a,b) => a.sort - b.sort);
+    addDataSheet(wb, 'Consolidado (' + granularity + ')', ['Período','Qtd.','Valor Total','Transações'], list.map(l => [l.label, l.qtd, +l.valor.toFixed(2), l.transacoes.size]));
+  }
+
+  function buildRentabilidadeSheets(wb, rows){
+    if (!COST_AVAILABLE) return;
+    const byProduct = new Map();
+    let receita=0, custo=0, qtdTotal=0;
+    const transacoes = new Set(), clientes = new Set();
+    rows.forEach(r => {
+      receita += r.valor; qtdTotal += r.qtd; transacoes.add(r.transacao);
+      if (r.cliente) clientes.add(r.cliente);
+      const custoLinha = (r.custoUnit != null ? r.custoUnit : 0) * r.qtd;
+      custo += custoLinha;
+      if (!byProduct.has(r.produto)) byProduct.set(r.produto, { produto:r.produto, receita:0, custo:0, qtd:0 });
+      const p = byProduct.get(r.produto);
+      p.receita += r.valor; p.custo += custoLinha; p.qtd += r.qtd;
+    });
+    const lucro = receita - custo;
+    const margemPct = receita ? lucro/receita*100 : 0;
+    const ticket = transacoes.size ? receita/transacoes.size : 0;
+
+    addDataSheet(wb, 'Rentabilidade - KPIs', ['Indicador','Valor'], [
+      ['Receita', +receita.toFixed(2)],
+      ['Lucro bruto', +lucro.toFixed(2)],
+      ['Margem (%)', +margemPct.toFixed(1)],
+      ['Quantidade de vendas (cupons)', transacoes.size],
+      ['Ticket médio', +ticket.toFixed(2)],
+      ['Produtos vendidos (itens)', qtdTotal],
+      ['Clientes únicos', clientes.size],
+    ]);
+
+    const MIN_QTD = 3;
+    const withMargin = [...byProduct.values()]
+      .filter(p => p.qtd >= MIN_QTD && p.receita > 0)
+      .map(p => ({ ...p, margemPct: (p.receita - p.custo) / p.receita * 100 }))
+      .sort((a,b) => b.margemPct - a.margemPct);
+    addDataSheet(wb, 'Margem por Produto', ['Produto','Qtd. Vendida','Receita','Margem (%)'],
+      withMargin.map(p => [p.produto, p.qtd, +p.receita.toFixed(2), +p.margemPct.toFixed(1)]));
+
+    const staleScope = RAW.filter(r => {
+      if (!selectedStores.has(r.loja)) return false;
+      if (!selectedCategories.has(r.categoria)) return false;
+      if (r.status.toLowerCase().startsWith('cancel')) return false;
+      return true;
+    });
+    const lastSaleByProduct = new Map();
+    staleScope.forEach(r => {
+      const cur = lastSaleByProduct.get(r.produto);
+      if (!cur || r.data > cur.data) lastSaleByProduct.set(r.produto, { data: r.data, loja: r.loja });
+    });
+    const staleList = [...lastSaleByProduct.entries()].map(([produto, info]) => ({
+      produto, ultimaVenda: info.data, loja: info.loja,
+      diasSemVenda: Math.round((REFERENCE_DATE - info.data) / 86400000),
+    })).filter(p => p.diasSemVenda >= staleDaysThreshold).sort((a,b) => b.diasSemVenda - a.diasSemVenda);
+    addDataSheet(wb, `Sem Venda ${staleDaysThreshold}+ dias`, ['Produto','Última Loja','Última Venda','Dias sem Venda'],
+      staleList.map(p => [p.produto, p.loja, fmtDate(p.ultimaVenda), p.diasSemVenda]));
+  }
+
+  function buildCanceladosSheets(wb){
+    const cancelRows = getCanceladosRecords();
+    if (!cancelRows.length) return;
+    const allRows = getAllRecordsIgnoringStatus();
+    const valorCancelado = cancelRows.reduce((s,r)=>s+r.valor, 0);
+    const qtdCancelada = cancelRows.reduce((s,r)=>s+r.qtd, 0);
+    const transacoesCanceladas = new Set(cancelRows.map(r=>r.transacao)).size;
+    const valorTotalGeral = allRows.reduce((s,r)=>s+r.valor, 0);
+    const taxa = valorTotalGeral ? valorCancelado/valorTotalGeral*100 : 0;
+
+    addDataSheet(wb, 'Cancelados - KPIs', ['Indicador','Valor'], [
+      ['Valor cancelado', +valorCancelado.toFixed(2)],
+      ['Quantidade cancelada', qtdCancelada],
+      ['Transações canceladas', transacoesCanceladas],
+      ['Taxa de cancelamento (%)', +taxa.toFixed(1)],
+    ]);
+
+    if (PAYMENT_AVAILABLE){
+      const byPag = new Map();
+      cancelRows.forEach(r => {
+        if (!byPag.has(r.pagamento)) byPag.set(r.pagamento, { pagamento:r.pagamento, qtd:0, valor:0, transacoes:new Set() });
+        const p = byPag.get(r.pagamento);
+        p.qtd += r.qtd; p.valor += r.valor; p.transacoes.add(r.transacao);
+      });
+      const pagList = [...byPag.values()].sort((a,b) => b.valor - a.valor);
+      addDataSheet(wb, 'Cancelados por Pagamento', ['Forma de Pagamento','Transações','Qtd.','Valor'],
+        pagList.map(p => [p.pagamento, p.transacoes.size, p.qtd, +p.valor.toFixed(2)]));
+    }
+  }
+
+  document.getElementById('btnExportExcel').addEventListener('click', async () => {
+    const btn = document.getElementById('btnExportExcel');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Gerando...';
+    try {
+      const originalTab = document.querySelector('.tab-btn.active').dataset.tab;
+      const goTo = async (tab) => {
+        document.querySelector(`.tab-btn[data-tab="${tab}"]`).click();
+        await new Promise(r => setTimeout(r, 150));
+      };
+      const images = {};
+      const grab = async (tab, list) => {
+        await goTo(tab);
+        list.forEach(([key, chart]) => {
+          if (!chart) return;
+          chart.resize();
+          chart.update('none');
+          images[key] = { base64: chart.toBase64Image('image/png', 1), width: chart.width, height: chart.height };
+        });
+      };
+
+      await grab('diario', [['diario', chartDiario]]);
+      await grab('itens', [['categorias', chartCategoriaPie]]);
+      await grab('consolidado', [['consolidado', chartConsolidado]]);
+      await grab('cancelados', [['cancelPagamento', chartPagamentoPie], ['canceladosPeriodo', chartCancelados]]);
+      await goTo(originalTab);
+
+      const rows = getFilteredRecords();
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Controle de Mercado — Dashboard de Vendas';
+      wb.created = new Date();
+
+      buildDetalheSheet(wb, rows);
+      buildItensSheet(wb, rows);
+      addImageSheet(wb, 'Gráfico - Categorias', images.categorias);
+      buildConsolidadoSheet(wb, rows);
+      addImageSheet(wb, 'Gráfico - Vendas Diárias', images.diario);
+      addImageSheet(wb, 'Gráfico - Consolidado', images.consolidado);
+      buildRentabilidadeSheets(wb, rows);
+      buildCanceladosSheets(wb);
+      if (images.cancelPagamento) addImageSheet(wb, 'Gráfico - Cancel. Pagamento', images.cancelPagamento);
+      if (images.canceladosPeriodo) addImageSheet(wb, 'Gráfico - Cancel. Período', images.canceladosPeriodo);
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'controle-mercado-' + new Date().toISOString().slice(0,10) + '.xlsx';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err){
+      alert('Não consegui gerar o Excel: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
